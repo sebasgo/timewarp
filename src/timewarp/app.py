@@ -35,6 +35,7 @@ class TimeWarpApp(App):
     directory: Path
     date = reactive(datetime.date.today, init=False)
     date_entries: list
+    list: ListView
     view: MarkdownViewer
 
     def __init__(self, directory):
@@ -45,14 +46,15 @@ class TimeWarpApp(App):
         scan(self.state, self.directory)
 
     def compose(self) -> ComposeResult:
-        list = ListView(id='list', classes='column')
-        list.border_title = date_str(self.date)
+        self.list = ListView(id='list', classes='column')
+        self.list.border_title = date_str(self.date)
         self.view = MarkdownViewer(show_table_of_contents=False, classes='column')
-        yield list
+        yield self.list
         yield self.view
         yield Footer()
 
     async def on_mount(self):
+        self.view.focus()
         await self.action_update_date_entries()
 
     def watch_date(self, old_date: datetime.date, new_date: datetime.date) -> None:
@@ -69,25 +71,21 @@ class TimeWarpApp(App):
 
     async def action_update_date_entries(self):
         day, month = self.date.day, self.date.month
-        entry_list = self.query_one('#list')
         self.date_entries = []
         items = []
-        entry_list.clear()
         for entry in self.state.journal_entries:
             if entry.date.day == day and entry.date.month == month:
                 self.date_entries.append(entry)
                 items.append(ListItem(Label(date_str(entry.date))))
-        entry_list.clear()
-        entry_list.extend(items)
+        await self.list.clear()
+        await self.list.extend(items)
         for i, entry in enumerate(self.date_entries):
             if entry.date.year <= self.date.year:
-                entry_list.index = i
+                self.list.index = i
                 break
 
     async def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         index = event.list_view.index
-        log('list highlight event', index=index)
         if index is not None:
             journal_entry = self.date_entries[index]
-            log('loading', path=journal_entry.path)
             await self.view.document.load(journal_entry.path)
