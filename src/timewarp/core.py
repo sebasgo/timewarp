@@ -28,7 +28,8 @@ def scan(state: AppState, directory: Path):
                 continue
             entry = JournalEntry(date, path)
             state.journal_entries.append(entry)
-    state.journal_entries.sort(key=attrgetter('date'))
+    state.journal_entries.sort(key=attrgetter('date'), reverse=True)
+
 
 def date_str(date: datetime.date) -> str:
     return date.strftime('%d.%m.%Y')
