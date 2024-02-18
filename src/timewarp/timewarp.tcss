@@ -4,6 +4,19 @@ Screen {
 
 .column {
     height: 100%;
-    width: 1fr;
-    border: solid green;
+}
+
+#list {
+    width: 16;
+    margin: 0 2 0 0;
+    border: round $secondary-darken-3;
+}
+
+#list:focus {
+    border: round $secondary-darken-1;
+}
+
+#list Label {
+    width: 100%;
+    text-align: center;
 }
