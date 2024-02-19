@@ -1,6 +1,7 @@
 """TUI for Time Warp."""
 
 import datetime
+import subprocess
 from pathlib import Path
 
 
@@ -16,6 +17,7 @@ from textual.widgets import ListView
 from textual.widgets import MarkdownViewer
 
 from .core import AppState
+from .core import JournalEntry
 from .core import date_str
 from .core import scan
 
@@ -30,11 +32,15 @@ class TimeWarpApp(App):
         Binding(key='h', action='set_date("prev_day")', description='Prev Day'),
         Binding(key='t', action='set_date("cur_day")', description='Today'),
         Binding(key='l', action='set_date("next_day")', description='Next Day'),
+        Binding(key='j', action='set_date("prev_year")', description='Prev Year'),
+        Binding(key='k', action='set_date("next_year")', description='Next Year'),
+        Binding(key='e', action='edit()', description='Edit'),
     ]
 
     directory: Path
     date = reactive(datetime.date.today, init=False)
-    date_entries: list
+    date_entries: list[JournalEntry]
+    current_entry: JournalEntry | None
     list: ListView
     view: MarkdownViewer
 
@@ -65,6 +71,10 @@ class TimeWarpApp(App):
             self.date += datetime.timedelta(days=1)
         elif direction == 'prev_day':
             self.date -= datetime.timedelta(days=1)
+        elif direction == 'next_year':
+            self.date = datetime.date(self.date.year + 1, self.date.month, self.date.day)
+        elif direction == 'prev_year':
+            self.date = datetime.date(self.date.year - 1, self.date.month, self.date.day)
         else:
             self.date = datetime.date.today()
         await self.action_update_date_entries()
@@ -84,8 +94,15 @@ class TimeWarpApp(App):
                 self.list.index = i
                 break
 
+    async def action_edit(self):
+        if self.current_entry is not None:
+            with self.suspend():
+                subprocess.call(['vim', str(self.current_entry.path)])
+
     async def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         index = event.list_view.index
         if index is not None:
-            journal_entry = self.date_entries[index]
-            await self.view.document.load(journal_entry.path)
+            self.current_entry = self.date_entries[index]
+            await self.view.document.load(self.current_entry.path)
+        else:
+            self.current_entry = None
