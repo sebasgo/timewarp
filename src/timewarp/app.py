@@ -35,8 +35,8 @@ class TimeWarpApp(App):
         Binding(key='h', action='set_date("prev_day")', description='Prev Day'),
         Binding(key='t', action='set_date("cur_day")', description='Today'),
         Binding(key='l', action='set_date("next_day")', description='Next Day'),
-        Binding(key='j', action='set_date("prev_year")', description='Prev Year'),
-        Binding(key='k', action='set_date("next_year")', description='Next Year'),
+        Binding(key='k', action='set_date("prev_year")', description='Prev Year'),
+        Binding(key='j', action='set_date("next_year")', description='Next Year'),
         Binding(key='e', action='edit()', description='Edit'),
         Binding(key='r', action='refresh()', description='Refresh'),
     ]
