@@ -5,11 +5,11 @@ import subprocess
 from pathlib import Path
 
 
-from textual import log
 from textual.app import App
 from textual.app import Binding
 from textual.app import ComposeResult
 from textual.reactive import reactive
+from textual.timer import Timer
 from textual.widgets import Footer
 from textual.widgets import Label
 from textual.widgets import ListItem
@@ -20,6 +20,9 @@ from .core import AppState
 from .core import JournalEntry
 from .core import date_str
 from .core import scan
+
+# TODO: dummy entries for missing dates (so one can edit them)
+# TODO: link parsing and following
 
 
 class TimeWarpApp(App):
@@ -35,6 +38,7 @@ class TimeWarpApp(App):
         Binding(key='j', action='set_date("prev_year")', description='Prev Year'),
         Binding(key='k', action='set_date("next_year")', description='Next Year'),
         Binding(key='e', action='edit()', description='Edit'),
+        Binding(key='r', action='refresh()', description='Refresh'),
     ]
 
     directory: Path
@@ -43,13 +47,13 @@ class TimeWarpApp(App):
     current_entry: JournalEntry | None
     list: ListView
     view: MarkdownViewer
+    refresh_timer: Timer
 
     def __init__(self, directory):
         super().__init__()
         self.state = AppState()
         self.date_entries = []
         self.directory = directory
-        scan(self.state, self.directory)
 
     def compose(self) -> ComposeResult:
         self.list = ListView(id='list', classes='column')
@@ -61,6 +65,8 @@ class TimeWarpApp(App):
 
     async def on_mount(self):
         self.view.focus()
+        self.refresh_timer = self.set_interval(60, self.action_refresh, name='background_refresh')
+        scan(self.state, self.directory)
         await self.action_update_date_entries()
 
     def watch_date(self, old_date: datetime.date, new_date: datetime.date) -> None:
@@ -98,6 +104,11 @@ class TimeWarpApp(App):
         if self.current_entry is not None:
             with self.suspend():
                 subprocess.call(['vim', str(self.current_entry.path)])
+
+    async def action_refresh(self):
+        self.refresh_timer.reset()
+        scan(self.state, self.directory)
+        await self.action_update_date_entries()
 
     async def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         index = event.list_view.index
