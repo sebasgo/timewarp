@@ -87,14 +87,16 @@ class TimeWarpApp(App):
 
     async def action_update_date_entries(self):
         day, month = self.date.day, self.date.month
-        self.date_entries = []
+        date_entries = []
         items = []
         for entry in self.state.journal_entries:
             if entry.date.day == day and entry.date.month == month:
-                self.date_entries.append(entry)
+                date_entries.append(entry)
                 items.append(ListItem(Label(date_str(entry.date))))
-        await self.list.clear()
-        await self.list.extend(items)
+        if date_entries != self.date_entries:
+            self.date_entries = date_entries
+            await self.list.clear()
+            await self.list.extend(items)
         for i, entry in enumerate(self.date_entries):
             if entry.date.year <= self.date.year:
                 self.list.index = i
