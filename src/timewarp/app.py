@@ -16,7 +16,6 @@ from textual.widgets import ListItem
 from textual.widgets import ListView
 from textual.widgets import MarkdownViewer
 
-from .core import AppState
 from .core import JournalEntry
 from .core import date_str
 from .core import scan
@@ -43,6 +42,7 @@ class TimeWarpApp(App):
 
     directory: Path
     date = reactive(datetime.date.today, init=False)
+    entries: list[JournalEntry]
     date_entries: list[JournalEntry]
     current_entry: JournalEntry | None
     list: ListView
@@ -51,7 +51,7 @@ class TimeWarpApp(App):
 
     def __init__(self, directory):
         super().__init__()
-        self.state = AppState()
+        self.entries = []
         self.date_entries = []
         self.directory = directory
 
@@ -66,7 +66,7 @@ class TimeWarpApp(App):
     async def on_mount(self):
         self.view.focus()
         self.refresh_timer = self.set_interval(60, self.action_refresh, name='background_refresh')
-        scan(self.state, self.directory)
+        self.entries = scan(self.directory)
         await self.action_update_date_entries()
 
     def watch_date(self, old_date: datetime.date, new_date: datetime.date) -> None:
@@ -89,7 +89,7 @@ class TimeWarpApp(App):
         day, month = self.date.day, self.date.month
         date_entries = []
         items = []
-        for entry in self.state.journal_entries:
+        for entry in self.entries:
             if entry.date.day == day and entry.date.month == month:
                 date_entries.append(entry)
                 items.append(ListItem(Label(date_str(entry.date))))
@@ -109,7 +109,7 @@ class TimeWarpApp(App):
 
     async def action_refresh(self):
         self.refresh_timer.reset()
-        scan(self.state, self.directory)
+        self.entries = scan(self.directory)
         await self.action_update_date_entries()
 
     async def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:

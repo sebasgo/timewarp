@@ -3,7 +3,6 @@
 import datetime
 import re
 from dataclasses import dataclass
-from dataclasses import field
 from operator import attrgetter
 from pathlib import Path
 
@@ -13,13 +12,9 @@ class JournalEntry:
     date: datetime.date
     path: Path
 
-@dataclass
-class AppState:
-    journal_entries: list[JournalEntry] = field(default_factory=list, init=False)
 
-
-def scan(state: AppState, directory: Path):
-    state.journal_entries = []
+def scan(directory: Path):
+    journal_entries = []
     for path in directory.glob(pattern='*.md'):
         if (matches := re.match(r'([0-9]{4})-([0-9]{2})-([0-9]{2}).md', path.name)) is not None:
             try:
@@ -27,8 +22,9 @@ def scan(state: AppState, directory: Path):
             except ValueError:
                 continue
             entry = JournalEntry(date, path)
-            state.journal_entries.append(entry)
-    state.journal_entries.sort(key=attrgetter('date'), reverse=True)
+            journal_entries.append(entry)
+    journal_entries.sort(key=attrgetter('date'), reverse=True)
+    return journal_entries
 
 
 def date_str(date: datetime.date) -> str:
