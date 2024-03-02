@@ -78,8 +78,12 @@ class TimeWarpApp(App):
         elif direction == 'prev_day':
             self.date -= datetime.timedelta(days=1)
         elif direction == 'next_year':
+            if not self.date_entries or self.date.year >= self.date_entries[0].date.year:
+                return
             self.date = datetime.date(self.date.year + 1, self.date.month, self.date.day)
         elif direction == 'prev_year':
+            if not self.date_entries or self.date.year <= self.date_entries[-1].date.year:
+                return
             self.date = datetime.date(self.date.year - 1, self.date.month, self.date.day)
         else:
             self.date = datetime.date.today()
