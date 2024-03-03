@@ -42,7 +42,7 @@ Running Time Warp
 After the setup of the development environment, the project can be run
 from the project directory with::
 
-    timewarp data/sample.txt
+    timewarp /path/to/journal/files
 
 This requires the virtual environment to be activated. In new shells,
 this step has to be repeated once from the project folder with::
