@@ -11,6 +11,7 @@ from textual.app import ComposeResult
 from textual.reactive import reactive
 from textual.timer import Timer
 from textual.widgets import Footer
+from textual.widgets import Header
 from textual.widgets import Label
 from textual.widgets import ListItem
 from textual.widgets import ListView
@@ -59,6 +60,7 @@ class TimeWarpApp(App):
         self.list = ListView(id='list', classes='column')
         self.list.border_title = date_str(self.date)
         self.view = MarkdownViewer(show_table_of_contents=False, classes='column')
+        yield Header(icon='📅')
         yield self.list
         yield self.view
         yield Footer()
