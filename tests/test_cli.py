@@ -24,8 +24,27 @@ def test_main_runs_app_with_directory(tmp_path, mocker):
 
     assert cli.main() == 0
 
-    app_class.assert_called_once_with(tmp_path)
+    app_class.assert_called_once_with(tmp_path, config_path=None, debug=False)
     app_class.return_value.run.assert_called_once_with()
+
+
+def test_main_passes_config_path(tmp_path, mocker):
+    app_class = mocker.patch.object(cli, 'TimeWarpApp')
+    config_path = tmp_path / 'config.toml'
+    mocker.patch.object(sys, 'argv', ['timewarp', str(tmp_path), '--config', str(config_path)])
+
+    assert cli.main() == 0
+
+    app_class.assert_called_once_with(tmp_path, config_path=config_path, debug=False)
+
+
+def test_main_passes_debug_flag(tmp_path, mocker):
+    app_class = mocker.patch.object(cli, 'TimeWarpApp')
+    mocker.patch.object(sys, 'argv', ['timewarp', str(tmp_path), '--debug'])
+
+    assert cli.main() == 0
+
+    app_class.assert_called_once_with(tmp_path, config_path=None, debug=True)
 
 
 def test_main_requires_directory(mocker):

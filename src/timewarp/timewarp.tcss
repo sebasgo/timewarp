@@ -20,3 +20,26 @@ Screen {
     width: 100%;
     text-align: center;
 }
+
+#list ListItem.divider {
+    height: 1;
+}
+
+#list ListItem.divider Label {
+    color: $text-muted;
+}
+
+#content {
+    width: 1fr;
+    height: 100%;
+}
+
+#content MarkdownViewer {
+    width: 100%;
+    height: 1fr;
+}
+
+#debug-log {
+    height: 12;
+    border-top: solid $secondary-darken-3;
+}

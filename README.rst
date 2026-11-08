@@ -50,6 +50,43 @@ this step has to be repeated once from the project folder with::
     source venv/bin/activate
 
 
+Configuration
+-------------
+
+Time Warp stores per-journal state in a TOML configuration file. By
+default it lives at ``$XDG_CONFIG_HOME/timewarp/config.toml`` (usually
+``~/.config/timewarp/config.toml``). The location can be overridden with
+the ``TIMEWARP_CONFIG`` environment variable or the ``--config`` option::
+
+    timewarp --config /path/to/config.toml /path/to/journal/files
+
+Currently the configuration remembers the last opened date for each
+journal directory::
+
+    [journals."/path/to/journal/files"]
+    last_opened = "2024-06-16"
+
+Additional journal entries can be shown at arbitrary offsets. Each
+offset is defined by a label and two dates::
+
+    [[special_offsets]]
+    label = "one month ago"
+    target = "2024-07-01"
+    reference = "2024-06-01"
+
+The offset is the difference between the target and reference dates. It
+is applied to the viewed day and month projected into the current year.
+
+Special entries appear in the left list below the regular entries,
+separated by a divider and identified by their label. They are skipped
+when no journal file exists for the computed date.
+
+Use ``--debug`` to show a log below the Markdown viewer. It lists the
+configured offsets and the dates looked up for the current year::
+
+    timewarp --debug /path/to/journal/files
+
+
 Running the Tests
 -----------------
 

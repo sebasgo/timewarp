@@ -17,8 +17,10 @@ def dir_path_arg(path: str) -> Path:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('dir', type=dir_path_arg, help='path to journal directory')
+    parser.add_argument('--config', type=Path, help='path to configuration file')
+    parser.add_argument('--debug', action='store_true', help='show debug log')
     args = parser.parse_args()
-    app = TimeWarpApp(args.dir)
+    app = TimeWarpApp(args.dir, config_path=args.config, debug=args.debug)
     app.run()
     return 0
 

@@ -58,6 +58,74 @@ def test_entries_for_date_matches_day_and_month_across_years():
     ]
 
 
+def test_special_entries_for_date_applies_offsets_and_labels():
+    entries = [
+        make_entry(2024, 6, 16),
+        make_entry(2024, 5, 16),
+        make_entry(2024, 3, 16),
+    ]
+    offsets = [
+        core.SpecialOffset('1 month', datetime.date(2024, 6, 16), datetime.date(2024, 5, 16)),
+        core.SpecialOffset('3 months', datetime.date(2024, 6, 16), datetime.date(2024, 3, 16)),
+    ]
+
+    assert core.special_entries_for_date(
+        entries, datetime.date(2024, 6, 16), offsets, current_year=2024
+    ) == [
+        core.SpecialEntry('1 month', entries[1]),
+        core.SpecialEntry('3 months', entries[2]),
+    ]
+
+
+def test_special_entries_for_date_skips_dates_without_entry():
+    entries = [make_entry(2024, 6, 16)]
+    offsets = [core.SpecialOffset('1 month', datetime.date(2024, 6, 16), datetime.date(2024, 5, 16))]
+
+    assert not core.special_entries_for_date(
+        entries, datetime.date(2024, 6, 16), offsets, current_year=2024
+    )
+
+
+def test_special_entries_for_date_without_offsets():
+    assert not core.special_entries_for_date(
+        [make_entry(2024, 6, 16)], datetime.date(2024, 6, 16), [], current_year=2024
+    )
+
+
+def test_special_entries_for_date_applies_full_offset():
+    entries = [make_entry(2023, 3, 1)]
+    offsets = [core.SpecialOffset('1 year', datetime.date(2024, 3, 1), datetime.date(2023, 3, 1))]
+
+    assert core.special_entries_for_date(
+        entries, datetime.date(2024, 3, 1), offsets, current_year=2024
+    ) == [core.SpecialEntry('1 year', entries[0])]
+
+
+def test_special_entries_for_date_projects_viewed_date_into_current_year():
+    entries = [
+        make_entry(2023, 6, 9),
+        make_entry(2026, 6, 9),
+    ]
+    offsets = [core.SpecialOffset('example', datetime.date(2024, 6, 16), datetime.date(2024, 5, 16))]
+    viewed = datetime.date(2023, 7, 10)
+
+    assert core.special_entries_for_date(entries, viewed, offsets, current_year=2023) == [
+        core.SpecialEntry('example', entries[0]),
+    ]
+    assert core.special_entries_for_date(entries, viewed, offsets, current_year=2026) == [
+        core.SpecialEntry('example', entries[1]),
+    ]
+
+
+def test_special_entries_for_date_clamps_leap_day_when_projecting():
+    entries = [make_entry(2023, 2, 27)]
+    offsets = [core.SpecialOffset('leap', datetime.date(2024, 3, 1), datetime.date(2024, 2, 29))]
+
+    assert core.special_entries_for_date(
+        entries, datetime.date(2024, 2, 29), offsets, current_year=2023
+    ) == [core.SpecialEntry('leap', entries[0])]
+
+
 def test_selected_index_uses_newest_entry_not_newer_than_date():
     entries = [make_entry(2024, 6, 16), make_entry(2022, 6, 16), make_entry(2020, 6, 16)]
 

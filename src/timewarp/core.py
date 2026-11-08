@@ -13,10 +13,37 @@ from typing import Sequence
 _JOURNAL_FILE_PATTERN = re.compile(r'^([0-9]{4})-([0-9]{2})-([0-9]{2})\.md$')
 
 
+def date_in_year(date: datetime.date, year: int) -> datetime.date:
+    """Return ``date`` in ``year``, clamping leap days if necessary."""
+    day = min(date.day, calendar.monthrange(year, date.month)[1])
+    return datetime.date(year, date.month, day)
+
+
 @dataclass(frozen=True)
 class JournalEntry:
     date: datetime.date
     path: Path
+
+
+@dataclass(frozen=True)
+class SpecialOffset:
+    label: str
+    target: datetime.date
+    reference: datetime.date
+
+    @property
+    def offset(self) -> datetime.timedelta:
+        return self.target - self.reference
+
+    def special_date(self, date: datetime.date, current_year: int) -> datetime.date:
+        """Return the entry date for ``date`` projected into ``current_year``."""
+        return date_in_year(date, current_year) - self.offset
+
+
+@dataclass(frozen=True)
+class SpecialEntry:
+    label: str
+    entry: JournalEntry
 
 
 def scan(directory: Path) -> list[JournalEntry]:
@@ -41,6 +68,22 @@ def date_str(date: datetime.date) -> str:
 def entries_for_date(entries: Iterable[JournalEntry], date: datetime.date) -> list[JournalEntry]:
     """Return all entries for the day and month of ``date``."""
     return [entry for entry in entries if entry.date.day == date.day and entry.date.month == date.month]
+
+
+def special_entries_for_date(
+    entries: Iterable[JournalEntry],
+    date: datetime.date,
+    offsets: Iterable[SpecialOffset],
+    current_year: int,
+) -> list[SpecialEntry]:
+    """Return labelled entries for offsets applied to ``date`` in ``current_year``."""
+    entries_by_date = {entry.date: entry for entry in entries}
+    special_entries = []
+    for offset in offsets:
+        entry = entries_by_date.get(offset.special_date(date, current_year))
+        if entry is not None:
+            special_entries.append(SpecialEntry(offset.label, entry))
+    return special_entries
 
 
 def selected_index(entries: Sequence[JournalEntry], date: datetime.date) -> int | None:
@@ -80,7 +123,4 @@ def _shift_year(current: datetime.date, offset: int, entries: Sequence[JournalEn
     if offset < 0 and current.year <= min(years):
         return current
 
-    year = current.year + offset
-    # A leap day does not exist in every year, so clamp to the last day of the month.
-    day = min(current.day, calendar.monthrange(year, current.month)[1])
-    return datetime.date(year, current.month, day)
+    return date_in_year(current, current.year + offset)
