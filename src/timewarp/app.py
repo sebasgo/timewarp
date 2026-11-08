@@ -215,8 +215,12 @@ class TimeWarpApp(App):  # pylint: disable=too-many-instance-attributes
                 items.extend(ListItem(Label(special.label, markup=False)) for special in special_entries)
                 list_entries.extend(special.entry for special in special_entries)
             self._list_entries = list_entries
-            await self.list.clear()
-            await self.list.extend(items)
+            # Batch the clear/extend so no frame is painted while the new
+            # ListItems exist without their Label children (which would
+            # briefly render as the "ListItem" CSS identifier).
+            with self.app.batch_update():
+                await self.list.clear()
+                await self.list.extend(items)
         self.list.index = self._selection_index(selection)
 
     def action_select_next_entry(self) -> None:
