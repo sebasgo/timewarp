@@ -28,6 +28,7 @@ from .core import JournalEntry
 from .core import SpecialEntry
 from .core import date_in_year
 from .core import date_str
+from .core import day_month_str
 from .core import entries_for_date
 from .core import scan
 from .core import selected_index
@@ -48,8 +49,8 @@ class TimeWarpApp(App):  # pylint: disable=too-many-instance-attributes
         Binding(key='h', action='set_date("prev_day")', description='Prev Day'),
         Binding(key='t', action='set_date("cur_day")', description='Today'),
         Binding(key='l', action='set_date("next_day")', description='Next Day'),
-        Binding(key='k', action='set_date("prev_year")', description='Prev Year'),
-        Binding(key='j', action='set_date("next_year")', description='Next Year'),
+        Binding(key='k', action='select_prev_entry', description='Prev Entry'),
+        Binding(key='j', action='select_next_entry', description='Next Entry'),
         Binding(key='e', action='edit()', description='Edit'),
         Binding(key='r', action='refresh()', description='Refresh'),
     ]
@@ -89,7 +90,7 @@ class TimeWarpApp(App):  # pylint: disable=too-many-instance-attributes
 
     def compose(self) -> ComposeResult:
         self.list = ListView(id='list', classes='column')
-        self.list.border_title = date_str(self._initial_date)
+        self.list.border_title = day_month_str(self._initial_date)
         self.view = MarkdownViewer(show_table_of_contents=False)
         yield Header(icon='📅')
         yield self.list
@@ -118,7 +119,7 @@ class TimeWarpApp(App):  # pylint: disable=too-many-instance-attributes
         self._log_special_targets()
 
     def watch_date(self, _old_date: datetime.date, new_date: datetime.date) -> None:
-        self.query_one('#list').border_title = date_str(new_date)
+        self.query_one('#list').border_title = day_month_str(new_date)
         if self.config.last_opened(self.directory) != new_date:
             self.config.set_last_opened(self.directory, new_date)
             try:
@@ -161,11 +162,41 @@ class TimeWarpApp(App):  # pylint: disable=too-many-instance-attributes
             self._log_debug(f'  {offset.label}: looking for {special_date.isoformat()} ({status})')
 
     async def action_set_date(self, direction):
-        self.date = target_date(self.date, direction, self.entries, today=self._today)
+        selection = self._capture_selection()
+        self.date = target_date(self.date, direction, today=self._today)
         self._log_special_targets()
-        await self.action_update_date_entries()
+        await self.action_update_date_entries(selection)
 
-    async def action_update_date_entries(self):
+    def _capture_selection(self) -> tuple[str | None, int | None] | None:
+        """Return the selected special label and year, if there is a selection."""
+        index = self.list.index
+        if index is None or not 0 <= index < len(self._list_entries):
+            return None
+        regular_count = len(self.date_entries)
+        if index < regular_count:
+            return None, self.date_entries[index].date.year
+        if index == regular_count:
+            return None
+        special_index = index - regular_count - 1
+        if 0 <= special_index < len(self.special_entries):
+            special = self.special_entries[special_index]
+            return special.label, special.entry.date.year
+        return None
+
+    def _selection_index(self, selection: tuple[str | None, int | None] | None) -> int | None:
+        """Return the index that best preserves ``selection`` in the current list."""
+        special_label, year = selection if selection is not None else (None, None)
+        if special_label is not None:
+            for offset, special in enumerate(self.special_entries):
+                if special.label == special_label:
+                    return len(self.date_entries) + 1 + offset
+        if year is not None:
+            for index, entry in enumerate(self.date_entries):
+                if entry.date.year == year:
+                    return index
+        return selected_index(self.date_entries, self.date)
+
+    async def action_update_date_entries(self, selection: tuple[str | None, int | None] | None = None):
         date_entries = entries_for_date(self.entries, self.date)
         special_entries = special_entries_for_date(
             self.entries,
@@ -186,7 +217,13 @@ class TimeWarpApp(App):  # pylint: disable=too-many-instance-attributes
             self._list_entries = list_entries
             await self.list.clear()
             await self.list.extend(items)
-        self.list.index = selected_index(self.date_entries, self.date)
+        self.list.index = self._selection_index(selection)
+
+    def action_select_next_entry(self) -> None:
+        self.list.action_cursor_down()
+
+    def action_select_prev_entry(self) -> None:
+        self.list.action_cursor_up()
 
     async def action_edit(self):
         if self.current_entry is not None:
@@ -194,9 +231,10 @@ class TimeWarpApp(App):  # pylint: disable=too-many-instance-attributes
                 subprocess.call([*shlex.split(self.editor), str(self.current_entry.path)])
 
     async def action_refresh(self):
+        selection = self._capture_selection()
         self.refresh_timer.reset()
         self.entries = scan(self.directory)
-        await self.action_update_date_entries()
+        await self.action_update_date_entries(selection)
 
     async def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         index = event.list_view.index

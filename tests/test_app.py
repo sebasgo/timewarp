@@ -19,7 +19,7 @@ async def test_startup_lists_entries_for_today(make_app, write_entry):
         assert app.date == today
         assert [entry.path for entry in app.date_entries] == [newest, older]
         assert app.list.index == 0
-        assert app.list.border_title == '16.06.2024'
+        assert app.list.border_title == '16.06.'
         assert app.current_entry == app.date_entries[0]
 
 
@@ -62,58 +62,100 @@ async def test_today_binding_returns_to_injected_today(make_app, write_entry):
         assert app.date == today
 
 
-async def test_year_navigation_is_clamped_to_entry_range(make_app, write_entry):
-    today = datetime.date(2022, 6, 16)
+async def test_jk_navigate_entries_without_changing_date(make_app, write_entry):
+    today = datetime.date(2024, 6, 16)
+    newest = write_entry(datetime.date(2024, 6, 16), '# 2024\n')
+    older = write_entry(datetime.date(2022, 6, 16), '# 2022\n')
+
+    app = make_app(today)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert app.list.index == 0
+        assert app.current_entry.path == newest
+
+        await pilot.press('j')
+        await pilot.pause()
+        assert app.date == today
+        assert app.list.index == 1
+        assert app.current_entry.path == older
+
+        await pilot.press('j')
+        await pilot.pause()
+        assert app.date == today
+        assert app.list.index == 1
+
+        await pilot.press('k')
+        await pilot.pause()
+        assert app.list.index == 0
+        assert app.current_entry.path == newest
+
+        await pilot.press('k')
+        await pilot.pause()
+        assert app.list.index == 0
+
+
+async def test_day_navigation_crosses_year_boundary(make_app, write_entry):
+    today = datetime.date(2024, 12, 31)
+    write_entry(today, '# New Year\'s Eve\n')
+
+    app = make_app(today)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        await pilot.press('l')
+        await pilot.pause()
+        assert app.date == datetime.date(2025, 1, 1)
+        assert app.list.border_title == '01.01.'
+        assert app.date_entries == []
+
+        await pilot.press('h')
+        await pilot.pause()
+        assert app.date == today
+        assert app.list.border_title == '31.12.'
+        assert len(app.date_entries) == 1
+
+
+async def test_day_navigation_keeps_entry_of_same_year(make_app, write_entry):
+    today = datetime.date(2024, 6, 16)
+    write_entry(datetime.date(2024, 6, 16), '# 2024\n')
+    write_entry(datetime.date(2023, 6, 16), '# 2023\n')
+    write_entry(datetime.date(2024, 6, 17), '# 2024 next day\n')
+    same_year_next_day = write_entry(datetime.date(2023, 6, 17), '# 2023 next day\n')
+
+    app = make_app(today)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert app.list.index == 0
+
+        await pilot.press('j')
+        await pilot.pause()
+        assert app.current_entry.date == datetime.date(2023, 6, 16)
+
+        await pilot.press('l')
+        await pilot.pause()
+        assert app.date == datetime.date(2024, 6, 17)
+        assert app.list.index == 1
+        assert app.current_entry.path == same_year_next_day
+
+
+async def test_day_navigation_falls_back_when_same_year_is_missing(make_app, write_entry):
+    today = datetime.date(2024, 6, 16)
     write_entry(datetime.date(2024, 6, 16), '# 2024\n')
     write_entry(datetime.date(2022, 6, 16), '# 2022\n')
-
-    app = make_app(today)
-    async with app.run_test() as pilot:
-        await pilot.pause()
-        assert app.list.index == 1
-
-        await pilot.press('j')
-        await pilot.pause()
-        assert app.date == datetime.date(2023, 6, 16)
-        assert app.list.index == 1
-
-        await pilot.press('j')
-        await pilot.pause()
-        assert app.date == datetime.date(2024, 6, 16)
-        assert app.list.index == 0
-
-        await pilot.press('j')
-        await pilot.pause()
-        assert app.date == datetime.date(2024, 6, 16)
-
-        await pilot.press('k')
-        await pilot.pause()
-        assert app.date == datetime.date(2023, 6, 16)
-        assert app.list.index == 1
-
-        await pilot.press('k')
-        await pilot.pause()
-        assert app.date == datetime.date(2022, 6, 16)
-
-        await pilot.press('k')
-        await pilot.pause()
-        assert app.date == datetime.date(2022, 6, 16)
-
-
-async def test_previous_year_from_leap_day_does_not_crash(make_app, write_entry):
-    today = datetime.date(2024, 2, 29)
-    write_entry(today, '# Leap day\n')
-    write_entry(datetime.date(2023, 2, 28), '# Not a leap year\n')
+    write_entry(datetime.date(2024, 6, 17), '# 2024 next day\n')
 
     app = make_app(today)
     async with app.run_test() as pilot:
         await pilot.pause()
 
-        await pilot.press('k')
+        await pilot.press('j')
         await pilot.pause()
+        assert app.current_entry.date == datetime.date(2022, 6, 16)
 
-        assert app.date == datetime.date(2023, 2, 28)
-        assert app.list.index == 0
+        await pilot.press('l')
+        await pilot.pause()
+        assert app.date == datetime.date(2024, 6, 17)
+        assert app.current_entry.date == datetime.date(2024, 6, 17)
 
 
 async def test_highlighting_entry_loads_markdown(make_app, write_entry):
@@ -195,7 +237,7 @@ async def test_startup_restores_last_opened_date(make_app, write_entry, journal_
 
         assert app.date == restored
         assert [entry.path for entry in app.date_entries] == [restored_path]
-        assert app.list.border_title == '10.05.2023'
+        assert app.list.border_title == '10.05.'
 
 
 async def test_startup_ignores_corrupt_config(make_app, config_path):
@@ -387,7 +429,33 @@ async def test_day_navigation_reprojects_special_entry(make_app, write_entry, co
         assert [special.entry.path for special in app.special_entries] == [next_special]
 
 
-async def test_year_navigation_does_not_change_special_entry(make_app, write_entry, config_path):
+async def test_day_navigation_keeps_selected_special_entry(make_app, write_entry, config_path):
+    today = datetime.date(2024, 6, 16)
+    write_entry(today, '# Today\n')
+    first_special = write_entry(datetime.date(2024, 5, 16), '# May 16\n')
+    next_special = write_entry(datetime.date(2024, 5, 17), '# May 17\n')
+    configure_special_offsets(
+        config_path,
+        SpecialOffset('1 month', datetime.date(2024, 6, 16), datetime.date(2024, 5, 16)),
+    )
+
+    app = make_app(today)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        app.list.index = 2
+        await pilot.pause()
+        assert app.current_entry.path == first_special
+
+        await pilot.press('l')
+        await pilot.pause()
+
+        assert app.date == datetime.date(2024, 6, 17)
+        assert app.list.index == 1
+        assert app.current_entry.path == next_special
+
+
+async def test_selecting_another_year_does_not_change_special_entry(make_app, write_entry, config_path):
     today = datetime.date(2024, 6, 16)
     write_entry(today, '# Today\n')
     write_entry(datetime.date(2025, 6, 16), '# Next year\n')
@@ -400,11 +468,13 @@ async def test_year_navigation_does_not_change_special_entry(make_app, write_ent
     app = make_app(today)
     async with app.run_test() as pilot:
         await pilot.pause()
+        assert app.list.index == 1
 
-        await pilot.press('j')
+        await pilot.press('k')
         await pilot.pause()
 
-        assert app.date == datetime.date(2025, 6, 16)
+        assert app.date == today
+        assert app.current_entry.date == datetime.date(2025, 6, 16)
         assert [special.entry.path for special in app.special_entries] == [special_path]
 
 
@@ -422,7 +492,7 @@ async def test_keyboard_navigation_skips_the_divider(make_app, write_entry, conf
         await pilot.pause()
 
         app.list.index = 0
-        app.list.action_cursor_down()
+        await pilot.press('j')
         await pilot.pause()
 
         assert app.list.index == 2

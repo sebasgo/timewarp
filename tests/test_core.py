@@ -45,6 +45,10 @@ def test_date_str():
     assert core.date_str(datetime.date(2024, 2, 9)) == '09.02.2024'
 
 
+def test_day_month_str():
+    assert core.day_month_str(datetime.date(2024, 2, 9)) == '09.02.'
+
+
 def test_entries_for_date_matches_day_and_month_across_years():
     entries = [
         make_entry(2024, 6, 16),
@@ -137,45 +141,24 @@ def test_selected_index_uses_newest_entry_not_newer_than_date():
 
 
 def test_target_date_moves_one_day():
-    entries = [make_entry(2024, 6, 16)]
-
     def today():
         return datetime.date(2024, 6, 16)
 
-    assert core.target_date(datetime.date(2024, 6, 16), 'next_day', entries, today) == datetime.date(2024, 6, 17)
-    assert core.target_date(datetime.date(2024, 6, 16), 'prev_day', entries, today) == datetime.date(2024, 6, 15)
-    assert core.target_date(datetime.date(2020, 1, 1), 'cur_day', entries, today) == datetime.date(2024, 6, 16)
+    assert core.target_date(datetime.date(2024, 6, 16), 'next_day', today) == datetime.date(2024, 6, 17)
+    assert core.target_date(datetime.date(2024, 6, 16), 'prev_day', today) == datetime.date(2024, 6, 15)
+    assert core.target_date(datetime.date(2020, 1, 1), 'cur_day', today) == datetime.date(2024, 6, 16)
 
 
-def test_target_date_shifts_year_within_entry_range():
-    entries = [make_entry(2024, 6, 16), make_entry(2020, 6, 16)]
-    current = datetime.date(2022, 6, 16)
-
-    assert core.target_date(current, 'next_year', entries) == datetime.date(2023, 6, 16)
-    assert core.target_date(current, 'prev_year', entries) == datetime.date(2021, 6, 16)
+def test_target_date_crosses_year_boundaries():
+    assert core.target_date(datetime.date(2024, 12, 31), 'next_day') == datetime.date(2025, 1, 1)
+    assert core.target_date(datetime.date(2024, 1, 1), 'prev_day') == datetime.date(2023, 12, 31)
 
 
-def test_target_date_clamps_year_shifts_at_entry_range():
-    entries = [make_entry(2024, 6, 16), make_entry(2020, 6, 16)]
-
-    assert core.target_date(datetime.date(2024, 6, 16), 'next_year', entries) == datetime.date(2024, 6, 16)
-    assert core.target_date(datetime.date(2020, 6, 16), 'prev_year', entries) == datetime.date(2020, 6, 16)
-
-
-def test_target_date_without_entries_keeps_year():
-    current = datetime.date(2024, 6, 16)
-
-    assert core.target_date(current, 'next_year', []) == current
-    assert core.target_date(current, 'prev_year', []) == current
-
-
-def test_target_date_clamps_leap_day():
-    entries = [make_entry(2024, 2, 29), make_entry(2020, 2, 29)]
-
-    assert core.target_date(datetime.date(2024, 2, 29), 'prev_year', entries) == datetime.date(2023, 2, 28)
-    assert core.target_date(datetime.date(2023, 2, 28), 'next_year', entries) == datetime.date(2024, 2, 28)
+def test_target_date_handles_leap_day():
+    assert core.target_date(datetime.date(2024, 2, 28), 'next_day') == datetime.date(2024, 2, 29)
+    assert core.target_date(datetime.date(2024, 2, 29), 'next_day') == datetime.date(2024, 3, 1)
 
 
 def test_target_date_rejects_unknown_direction():
     with pytest.raises(ValueError, match='unknown direction'):
-        core.target_date(datetime.date(2024, 6, 16), 'sideways', [])
+        core.target_date(datetime.date(2024, 6, 16), 'sideways')

@@ -65,6 +65,10 @@ def date_str(date: datetime.date) -> str:
     return date.strftime('%d.%m.%Y')
 
 
+def day_month_str(date: datetime.date) -> str:
+    return date.strftime('%d.%m.')
+
+
 def entries_for_date(entries: Iterable[JournalEntry], date: datetime.date) -> list[JournalEntry]:
     """Return all entries for the day and month of ``date``."""
     return [entry for entry in entries if entry.date.day == date.day and entry.date.month == date.month]
@@ -97,7 +101,6 @@ def selected_index(entries: Sequence[JournalEntry], date: datetime.date) -> int 
 def target_date(
     current: datetime.date,
     direction: str,
-    entries: Sequence[JournalEntry],
     today: Callable[[], datetime.date] | None = None,
 ) -> datetime.date:
     """Calculate the date to navigate to from ``current``."""
@@ -107,20 +110,4 @@ def target_date(
         return current - datetime.timedelta(days=1)
     if direction == 'cur_day':
         return (today or datetime.date.today)()
-    if direction == 'next_year':
-        return _shift_year(current, 1, entries)
-    if direction == 'prev_year':
-        return _shift_year(current, -1, entries)
     raise ValueError(f'unknown direction: {direction!r}')
-
-
-def _shift_year(current: datetime.date, offset: int, entries: Sequence[JournalEntry]) -> datetime.date:
-    if not entries:
-        return current
-    years = [entry.date.year for entry in entries]
-    if offset > 0 and current.year >= max(years):
-        return current
-    if offset < 0 and current.year <= min(years):
-        return current
-
-    return date_in_year(current, current.year + offset)
