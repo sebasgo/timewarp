@@ -40,7 +40,11 @@ lint/pylint: ## check style with flake8
 lint: lint/pylint ## check style
 
 test: ## run tests quickly with the default Python
-	pytest tests
+	python -m pytest
+
+coverage: ## run tests and open the HTML coverage report
+	python -m pytest --cov-report=html
+	xdg-open htmlcov/index.html
 
 docs: ## generate Sphinx HTML documentation, including API docs
 	rm -f docs/timewarp.rst

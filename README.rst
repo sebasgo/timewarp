@@ -49,3 +49,28 @@ this step has to be repeated once from the project folder with::
 
     source venv/bin/activate
 
+
+Running the Tests
+-----------------
+
+The tests are run with `pytest`_. After setting up the development
+environment, run them from the project directory with::
+
+    python -m pytest
+
+The suite includes unit tests for the journal logic as well as headless
+integration tests for the Textual user interface. Coverage is collected
+automatically and must stay at or above 90%. To generate an HTML report
+instead, use::
+
+    python -m pytest --cov-report=html
+
+Alternatively, with `uv`_ installed, no manual virtual environment is
+required::
+
+    uv sync --extra dev
+    uv run --extra dev pytest
+
+.. _pytest: https://pytest.org
+.. _uv: https://docs.astral.sh/uv/
+

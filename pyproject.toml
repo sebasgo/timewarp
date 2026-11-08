@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 name = "timewarp"
 description = "Return to days begone."
 readme = "README.rst"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = {file = "LICENSE"}
 dynamic = ["version"]
 keywords = []
@@ -25,6 +25,7 @@ dev = [
     'docutils<0.19',
     'pylint',
     'pytest',
+    'pytest-asyncio',
     'pytest-cov',
     'pytest-mock',
     'textual-dev',
@@ -34,6 +35,27 @@ dev = [
 [project.scripts]
 timewarp = "timewarp.__main__:main"
 
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra --strict-markers --cov=timewarp --cov-report=term-missing"
+
+
+[tool.coverage.run]
+branch = true
+source = ["timewarp"]
+
+
+[tool.coverage.report]
+fail_under = 90
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+]
 
 
 [tool.pylint.MASTER]

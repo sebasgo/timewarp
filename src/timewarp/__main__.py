@@ -11,8 +11,7 @@ def dir_path_arg(path: str) -> Path:
     path = Path(path)
     if path.is_dir():
         return path
-    else:
-        raise argparse.ArgumentTypeError(f"{path} is not a valid path")
+    raise argparse.ArgumentTypeError(f"{path} is not a valid path")
 
 
 def main():

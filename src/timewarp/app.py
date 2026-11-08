@@ -1,8 +1,11 @@
 """TUI for Time Warp."""
 
 import datetime
+import os
+import shlex
 import subprocess
 from pathlib import Path
+from typing import Callable
 
 
 from textual.app import App
@@ -19,13 +22,16 @@ from textual.widgets import MarkdownViewer
 
 from .core import JournalEntry
 from .core import date_str
+from .core import entries_for_date
 from .core import scan
+from .core import selected_index
+from .core import target_date
 
 # TODO: dummy entries for missing dates (so one can edit them)
 # TODO: link parsing and following
 
 
-class TimeWarpApp(App):
+class TimeWarpApp(App):  # pylint: disable=too-many-instance-attributes
 
     CSS_PATH = 'timewarp.tcss'
     TITLE = 'Timewarp'
@@ -50,11 +56,19 @@ class TimeWarpApp(App):
     view: MarkdownViewer
     refresh_timer: Timer
 
-    def __init__(self, directory):
+    def __init__(
+        self,
+        directory: Path,
+        today: Callable[[], datetime.date] = datetime.date.today,
+        editor: str | None = None,
+    ):
         super().__init__()
         self.entries = []
         self.date_entries = []
+        self.current_entry = None
         self.directory = directory
+        self._today = today
+        self.editor = editor or os.environ.get('EDITOR', 'vim')
 
     def compose(self) -> ComposeResult:
         self.list = ListView(id='list', classes='column')
@@ -66,52 +80,32 @@ class TimeWarpApp(App):
         yield Footer()
 
     async def on_mount(self):
+        self.date = self._today()
         self.view.focus()
         self.refresh_timer = self.set_interval(60, self.action_refresh, name='background_refresh')
         self.entries = scan(self.directory)
         await self.action_update_date_entries()
 
-    def watch_date(self, old_date: datetime.date, new_date: datetime.date) -> None:
+    def watch_date(self, _old_date: datetime.date, new_date: datetime.date) -> None:
         self.query_one('#list').border_title = date_str(new_date)
 
     async def action_set_date(self, direction):
-        if direction == 'next_day':
-            self.date += datetime.timedelta(days=1)
-        elif direction == 'prev_day':
-            self.date -= datetime.timedelta(days=1)
-        elif direction == 'next_year':
-            if not self.date_entries or self.date.year >= self.date_entries[0].date.year:
-                return
-            self.date = datetime.date(self.date.year + 1, self.date.month, self.date.day)
-        elif direction == 'prev_year':
-            if not self.date_entries or self.date.year <= self.date_entries[-1].date.year:
-                return
-            self.date = datetime.date(self.date.year - 1, self.date.month, self.date.day)
-        else:
-            self.date = datetime.date.today()
+        self.date = target_date(self.date, direction, self.entries, today=self._today)
         await self.action_update_date_entries()
 
     async def action_update_date_entries(self):
-        day, month = self.date.day, self.date.month
-        date_entries = []
-        items = []
-        for entry in self.entries:
-            if entry.date.day == day and entry.date.month == month:
-                date_entries.append(entry)
-                items.append(ListItem(Label(date_str(entry.date))))
+        date_entries = entries_for_date(self.entries, self.date)
         if date_entries != self.date_entries:
             self.date_entries = date_entries
+            items = [ListItem(Label(date_str(entry.date))) for entry in date_entries]
             await self.list.clear()
             await self.list.extend(items)
-        for i, entry in enumerate(self.date_entries):
-            if entry.date.year <= self.date.year:
-                self.list.index = i
-                break
+        self.list.index = selected_index(self.date_entries, self.date)
 
     async def action_edit(self):
         if self.current_entry is not None:
             with self.suspend():
-                subprocess.call(['vim', str(self.current_entry.path)])
+                subprocess.call([*shlex.split(self.editor), str(self.current_entry.path)])
 
     async def action_refresh(self):
         self.refresh_timer.reset()
@@ -120,7 +114,7 @@ class TimeWarpApp(App):
 
     async def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         index = event.list_view.index
-        if index is not None:
+        if index is not None and 0 <= index < len(self.date_entries):
             self.current_entry = self.date_entries[index]
             await self.view.document.load(self.current_entry.path)
         else:
