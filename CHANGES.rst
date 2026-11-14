@@ -8,4 +8,6 @@ Version 0.1
 - Add a debug log, enabled with ``--debug``.
 - Navigate journal entries with ``j``/``k`` and days with ``h``/``l``. The
   list title shows only the day and month.
+- Render Obsidian-style internal links and follow links between dated journal
+  entries, including heading anchors.
 

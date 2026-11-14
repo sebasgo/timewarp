@@ -604,3 +604,152 @@ async def test_debug_logs_special_targets_on_navigation(make_app, write_entry, c
         log = debug_log_text(app)
         assert 'Special entries for 2024-06-17 projected to 2024-06-17:' in log
         assert 'looking for 2024-05-17 (found)' in log
+
+
+async def test_obsidian_link_alias_is_rendered(make_app, write_entry):
+    today = datetime.date(2024, 6, 16)
+    write_entry(today, 'Go [[2023-06-16|last year]].\n')
+
+    app = make_app(today)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        blocks = [block.render().plain for block in app.view.document.query('MarkdownBlock')]
+        assert any('last year' in text for text in blocks)
+        assert all('[[' not in text for text in blocks)
+
+
+async def test_obsidian_link_switches_to_linked_date(make_app, write_entry):
+    today = datetime.date(2024, 6, 16)
+    write_entry(today, '# Today\n\n[[2023-06-16|last year]]\n')
+    linked = write_entry(datetime.date(2023, 6, 16), '# Linked\n\nLinked text.\n')
+
+    app = make_app(today)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        await app.view.go('obsidian:2023-06-16')
+        await pilot.pause()
+
+        assert app.date == datetime.date(2023, 6, 16)
+        assert app.current_entry is not None
+        assert app.current_entry.path == linked
+        assert app.list.border_title == '16.06.'
+        blocks = [block.render().plain for block in app.view.document.query('MarkdownBlock')]
+        assert any('Linked text.' in text for text in blocks)
+
+
+async def test_obsidian_link_follows_heading_anchor(make_app, write_entry, mocker):
+    today = datetime.date(2024, 6, 16)
+    write_entry(today, '[[2023-06-16#Linked Heading]]\n')
+    linked = write_entry(datetime.date(2023, 6, 16), '# Linked Heading\n\nLinked text.\n')
+
+    app = make_app(today)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        goto_anchor = mocker.spy(app.view.document, 'goto_anchor')
+
+        await app.view.go('obsidian:2023-06-16#Linked Heading')
+        await pilot.pause()
+
+        assert app.current_entry is not None
+        assert app.current_entry.path == linked
+        goto_anchor.assert_called_with('linked-heading')
+
+
+async def test_obsidian_link_to_current_entry_keeps_heading_anchor(make_app, write_entry, mocker):
+    today = datetime.date(2024, 6, 16)
+    write_entry(today, '# Today\n\n## Heading\n\n[[#Heading]]\n')
+
+    app = make_app(today)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        goto_anchor = mocker.spy(app.view.document, 'goto_anchor')
+
+        await app.view.go(f'obsidian:{today.isoformat()}#Heading')
+        await pilot.pause()
+
+        assert app.date == today
+        assert app.current_entry is not None
+        goto_anchor.assert_called_with('heading')
+
+
+async def test_obsidian_same_document_heading_link(make_app, write_entry, mocker):
+    today = datetime.date(2024, 6, 16)
+    write_entry(today, '# First\n\n[[#Second]]\n\n## Second\n')
+
+    app = make_app(today)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        goto_anchor = mocker.spy(app.view.document, 'goto_anchor')
+
+        await app.view.go('obsidian:#Second')
+        await pilot.pause()
+
+        assert app.date == today
+        goto_anchor.assert_called_once_with('second')
+
+
+async def test_obsidian_link_ignores_block_reference_anchor(make_app, write_entry, mocker):
+    today = datetime.date(2024, 6, 16)
+    write_entry(today, '[[2023-06-16#^block-id]]\n')
+    linked = write_entry(datetime.date(2023, 6, 16), '# Linked\n\nLinked text.\n')
+
+    app = make_app(today)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        goto_anchor = mocker.spy(app.view.document, 'goto_anchor')
+
+        await app.view.go('obsidian:2023-06-16#^block-id')
+        await pilot.pause()
+
+        assert app.current_entry is not None
+        assert app.current_entry.path == linked
+        goto_anchor.assert_not_called()
+
+
+async def test_obsidian_link_to_non_journal_target_warns(make_app, write_entry, mocker):
+    today = datetime.date(2024, 6, 16)
+    write_entry(today, '[[Other note]]\n')
+
+    app = make_app(today)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        notify = mocker.patch.object(app, 'notify')
+
+        await app.view.go('obsidian:Other note')
+        await pilot.pause()
+
+        assert app.date == today
+        notify.assert_called_once_with('Other note is not a journal entry.', severity='warning')
+
+
+async def test_obsidian_link_to_missing_journal_entry_warns(make_app, write_entry, mocker):
+    today = datetime.date(2024, 6, 16)
+    write_entry(today, '[[2023-06-16]]\n')
+
+    app = make_app(today)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        notify = mocker.patch.object(app, 'notify')
+
+        await app.view.go('obsidian:2023-06-16')
+        await pilot.pause()
+
+        assert app.date == today
+        notify.assert_called_once_with('No journal entry for 2023-06-16.', severity='warning')
+
+
+async def test_follow_obsidian_link_ignores_other_hrefs(make_app, write_entry):
+    today = datetime.date(2024, 6, 16)
+    path = write_entry(today, '# Today\n')
+
+    app = make_app(today)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+
+        await app._follow_obsidian_link('https://example.com')  # pylint: disable=protected-access
+
+        assert app.date == today
+        assert app.current_entry is not None
+        assert app.current_entry.path == path

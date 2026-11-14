@@ -19,7 +19,6 @@ from textual.widgets import Header
 from textual.widgets import Label
 from textual.widgets import ListItem
 from textual.widgets import ListView
-from textual.widgets import MarkdownViewer
 from textual.widgets import RichLog
 
 from .config import Config
@@ -34,9 +33,14 @@ from .core import scan
 from .core import selected_index
 from .core import special_entries_for_date
 from .core import target_date
+from .obsidian import JournalViewer
+from .obsidian import ObsidianLinkClicked
+from .obsidian import heading_anchor
+from .obsidian import linked_date
+from .obsidian import markdown_parser
+from .obsidian import parse_href
 
 # TODO: dummy entries for missing dates (so one can edit them)
-# TODO: link parsing and following
 
 
 class TimeWarpApp(App):  # pylint: disable=too-many-instance-attributes
@@ -62,9 +66,10 @@ class TimeWarpApp(App):  # pylint: disable=too-many-instance-attributes
     special_entries: list[SpecialEntry]
     current_entry: JournalEntry | None
     list: ListView
-    view: MarkdownViewer
+    view: JournalViewer
     debug_log: RichLog | None
     refresh_timer: Timer
+    _pending_anchor: str
 
     def __init__(  # pylint: disable=too-many-arguments
         self,
@@ -87,11 +92,15 @@ class TimeWarpApp(App):  # pylint: disable=too-many-instance-attributes
         self._initial_date = self.config.last_opened(directory) or today()
         self.debug_enabled = debug
         self.debug_log = None
+        self._pending_anchor = ''
 
     def compose(self) -> ComposeResult:
         self.list = ListView(id='list', classes='column')
         self.list.border_title = day_month_str(self._initial_date)
-        self.view = MarkdownViewer(show_table_of_contents=False)
+        self.view = JournalViewer(
+            show_table_of_contents=False,
+            parser_factory=markdown_parser,
+        )
         yield Header(icon='📅')
         yield self.list
         with Vertical(id='content'):
@@ -196,7 +205,9 @@ class TimeWarpApp(App):  # pylint: disable=too-many-instance-attributes
                     return index
         return selected_index(self.date_entries, self.date)
 
-    async def action_update_date_entries(self, selection: tuple[str | None, int | None] | None = None):
+    async def action_update_date_entries(
+        self, selection: tuple[str | None, int | None] | None = None
+    ) -> bool:
         date_entries = entries_for_date(self.entries, self.date)
         special_entries = special_entries_for_date(
             self.entries,
@@ -204,7 +215,9 @@ class TimeWarpApp(App):  # pylint: disable=too-many-instance-attributes
             self.config.special_offsets,
             current_year=self._today().year,
         )
+        rebuilt = False
         if date_entries != self.date_entries or special_entries != self.special_entries:
+            rebuilt = True
             self.date_entries = date_entries
             self.special_entries = special_entries
             items = [ListItem(Label(date_str(entry.date))) for entry in date_entries]
@@ -222,6 +235,7 @@ class TimeWarpApp(App):  # pylint: disable=too-many-instance-attributes
                 await self.list.clear()
                 await self.list.extend(items)
         self.list.index = self._selection_index(selection)
+        return rebuilt
 
     def action_select_next_entry(self) -> None:
         self.list.action_cursor_down()
@@ -247,4 +261,44 @@ class TimeWarpApp(App):  # pylint: disable=too-many-instance-attributes
         else:
             self.current_entry = None
         if self.current_entry is not None:
-            await self.view.document.load(self.current_entry.path)
+            location = str(self.current_entry.path)
+            anchor, self._pending_anchor = self._pending_anchor, ''
+            if anchor:
+                location = f'{location}#{anchor}'
+            await self.view.document.load(Path(location))
+
+    async def on_obsidian_link_clicked(self, event: ObsidianLinkClicked) -> None:
+        event.stop()
+        await self._follow_obsidian_link(event.href)
+
+    async def _follow_obsidian_link(self, href: str) -> None:
+        parsed = parse_href(href)
+        if parsed is None:
+            return
+        target, anchor = parsed
+        if not target:
+            heading = heading_anchor(anchor)
+            if heading:
+                self.view.document.goto_anchor(heading)
+            return
+        date = linked_date(target)
+        if date is None:
+            self.notify(f'{target} is not a journal entry.', severity='warning')
+            return
+        entry = next((entry for entry in self.entries if entry.date == date), None)
+        if entry is None:
+            self.notify(f'No journal entry for {date.isoformat()}.', severity='warning')
+            return
+        self._pending_anchor = heading_anchor(anchor)
+        previous_index = self.list.index
+        self.date = date
+        rebuilt = await self.action_update_date_entries((None, date.year))
+        if not rebuilt and self.list.index == previous_index:
+            # No Highlighted message is emitted when the index does not
+            # change, so show the linked entry (and anchor) ourselves.
+            self.current_entry = entry
+            pending_anchor, self._pending_anchor = self._pending_anchor, ''
+            location = str(entry.path)
+            if pending_anchor:
+                location = f'{location}#{pending_anchor}'
+            await self.view.document.load(Path(location))

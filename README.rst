@@ -87,6 +87,19 @@ configured offsets and the dates looked up for the current year::
     timewarp --debug /path/to/journal/files
 
 
+Obsidian Links
+--------------
+
+Journal files may use Obsidian's internal link syntax. Time Warp renders
+``[[2024-06-16]]`` and ``[[2024-06-16|label]]`` as links and follows them
+when clicked. Heading references such as ``[[2024-06-16#Heading]]`` and
+``[[#Heading]]`` jump to the matching heading.
+
+Only links to dated journal entries are followed; other targets are ignored.
+Block references (``[[2024-06-16#^block]]``) are not supported. Links inside
+code are left untouched, and the journal files are never modified.
+
+
 Running the Tests
 -----------------
 
