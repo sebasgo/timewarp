@@ -3,14 +3,10 @@
 import datetime
 import os
 import tempfile
+import tomllib
 from dataclasses import dataclass
 from dataclasses import field
 from pathlib import Path
-
-try:  # pragma: no cover
-    import tomllib
-except ModuleNotFoundError:  # pragma: no cover
-    import tomli as tomllib
 
 import tomli_w
 

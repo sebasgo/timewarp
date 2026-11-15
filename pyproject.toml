@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 name = "timewarp"
 description = "Return to days begone."
 readme = "README.rst"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = {file = "LICENSE"}
 dynamic = ["version"]
 keywords = []
@@ -16,7 +16,6 @@ authors = [
 ]
 dependencies = [
     "textual",
-    "tomli>=2; python_version < '3.11'",
     "tomli-w",
 ]
 

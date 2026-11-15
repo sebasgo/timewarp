@@ -1,6 +1,7 @@
 Version 0.1
 ###########
 
+- Raise minimum required Python version to 3.11.
 - Remember the last opened date per journal directory in a configuration
   file.
 - Show journal entries at configurable offsets from the viewed date projected

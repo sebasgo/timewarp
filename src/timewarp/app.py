@@ -7,7 +7,6 @@ import subprocess
 from pathlib import Path
 from typing import Callable
 
-
 from textual.app import App
 from textual.app import Binding
 from textual.app import ComposeResult

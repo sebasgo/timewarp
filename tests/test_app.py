@@ -324,7 +324,7 @@ async def test_special_entries_are_listed_after_a_disabled_divider(make_app, wri
         assert not items[0].disabled
         assert items[1].disabled
         assert not items[2].disabled
-        assert items[2].children[0].renderable.plain == '1 month'
+        assert items[2].children[0].render().plain == '1 month'
 
 
 async def test_missing_special_entries_are_skipped(make_app, write_entry, config_path):
